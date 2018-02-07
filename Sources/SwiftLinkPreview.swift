@@ -269,7 +269,7 @@ extension SwiftLinkPreview {
     }
 
     // Extract HTML code and the information contained on it
-    fileprivate func extractInfo(_ url: URL, cancellable: Cancellable, canonicalUrl: String?, completion: @escaping (Response) -> Void, onError: @escaping (PreviewError) -> ()) {
+    fileprivate func extractInfo(_ url: URL, cancellable: Cancellable, canonicalUrl: String?, completion: @escaping (Response) -> Void, onError: (PreviewError) -> ()) {
         if cancellable.isCancelled {return}
 
         if(url.absoluteString.isImage()) {
@@ -288,52 +288,6 @@ extension SwiftLinkPreview {
                     if !cancellable.isCancelled { onError(.invalidURL(url.absoluteString)) }
                     return
                 }
-                
-                var task: URLSessionDataTask?
-                var request = URLRequest(url: sourceUrl)
-                request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_6) AppleWebKit/601.7.8 (KHTML, like Gecko) Version/9.1.3 Safari/601.7.8", forHTTPHeaderField: "User-Agent")
-                
-                task = session.dataTask(with: request, completionHandler: { data, response, error in
-                    if error != nil {
-                        self.workQueue.async {
-                            if !cancellable.isCancelled {
-                                onError(.cannotBeOpened("\(url.absoluteString): \(error.debugDescription)"))
-                            }
-                        }
-                        task = nil
-                    } else {
-                        var source: NSString? = nil
-                        NSString.stringEncoding(for: data!, encodingOptions: nil, convertedString: &source, usedLossyConversion: nil)
-                        
-                        if let source = source {
-                            self.workQueue.async {
-                                if !cancellable.isCancelled {
-                                    self.parseHtmlString(source as String, canonicalUrl: canonicalUrl, completion: completion)
-                                }
-                            }
-                            task = nil
-                        } else {
-                            self.workQueue.async {
-                                if !cancellable.isCancelled {
-                                    onError(.parseError(sourceUrl.absoluteString))
-                                }
-                            }
-                            task = nil
-                        }
-                    }
-                })
-                
-                if let task = task {
-                    task.resume()
-                } else {
-                    self.workQueue.async {
-                        if !cancellable.isCancelled {
-                            onError(.cannotBeOpened(url.absoluteString))
-                        }
-                    }
-                }
-
-                /*
                 let data = try Data(contentsOf: sourceUrl)
                 var source: NSString? = nil
                 NSString.stringEncoding(for: data, encodingOptions: nil, convertedString: &source, usedLossyConversion: nil)
@@ -347,7 +301,6 @@ extension SwiftLinkPreview {
                         onError(.parseError(sourceUrl.absoluteString))
                     }
                 }
-                */
             } catch let error {
                 if !cancellable.isCancelled {
                     let details = "\(sourceUrl?.absoluteString ?? String()): \(error.localizedDescription)"
@@ -356,6 +309,7 @@ extension SwiftLinkPreview {
             }
         }
     }
+
 
     private func parseHtmlString(_ htmlString: String, canonicalUrl: String?, completion: @escaping (Response) -> Void) {
         completion(self.performPageCrawling(self.cleanSource(htmlString), canonicalUrl: canonicalUrl))
